@@ -2,20 +2,18 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    
     use HasFactory, Notifiable;
 
     /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
+     * Atributos asignables en masa
      */
     protected $fillable = [
         'name',
@@ -24,9 +22,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
+     * Atributos ocultos al serializar
      */
     protected $hidden = [
         'password',
@@ -34,9 +30,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Casts de atributos
      */
     protected function casts(): array
     {
@@ -44,5 +38,21 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Relación: un usuario tiene muchas citas
+     */
+    public function citas()
+    {
+        return $this->hasMany(Cita::class, 'usuario_id');
+    }
+
+    /**
+     * Relación: un usuario tiene una ubicación
+     */
+    public function ubicacion()
+    {
+        return $this->hasOne(Ubicacion::class, 'usuario_id');
     }
 }

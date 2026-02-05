@@ -15,24 +15,34 @@ return [
     */
 
     'postmark' => [
-        'key' => env('POSTMARK_API_KEY'),
-    ],
-
-    'resend' => [
-        'key' => env('RESEND_API_KEY'),
+        'token' => env('POSTMARK_TOKEN'),
     ],
 
     'ses' => [
-        'key' => env('AWS_ACCESS_KEY_ID'),
-        'secret' => env('AWS_SECRET_ACCESS_KEY'),
+        'clave' => env('AWS_ACCESS_KEY_ID'),
+        'secreto' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'resend' => [
+        'clave' => env('RESEND_KEY'),
+    ],
+
     'slack' => [
-        'notifications' => [
-            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
-            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
+        'notificaciones' => [
+            'token_oauth_bot' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
+            'canal' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
+    ],
+
+    // Configuración de API de Google Maps
+    'google_maps' => [
+        'clave_api' => env('GOOGLE_MAPS_API_KEY'),
+    ],
+
+    // Configuración de API de OpenWeather
+    'openweather' => [
+        'clave_api' => env('OPENWEATHER_API_KEY'),
     ],
 
 ];
