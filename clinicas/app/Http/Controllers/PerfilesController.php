@@ -3,121 +3,144 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\User; // ✅ CORRECTO: App con mayúscula
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Database\QueryException;
 
 class PerfilesController extends Controller
 {
-    /**
-     * Muestra el formulario de edición del perfil
-     */
+    
     public function editar(): View
     {
         $usuario = Auth::user();
-        
-        // Obtener datos del clima si el usuario tiene ubicación
+
+        // Verificar que sea un modelo válido antes de llamar métodos
         $datosClima = null;
-        if ($usuario->ubicacion) {
-            $coords = $usuario->ubicacion;
-            $datosClima = $this->obtenerDatosClima($coords->latitud, $coords->longitud);
+        if ($usuario instanceof User && $usuario->tieneUbicacion()) {
+            $datosClima = $this->obtenerDatosClima($usuario->latitud, $usuario->longitud);
         }
-        
-        return view('profile.edit', [
+
+        return view('perfil.editar', [
             'usuario' => $usuario,
             'datosClima' => $datosClima,
         ]);
     }
 
-    /**
-     * Actualiza los datos del perfil
-     */
+
     public function actualizar(Request $request): RedirectResponse
     {
-        $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . Auth::id()],
-        ]);
+        try {
+            $request->validate([
+                'nombre' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . Auth::id()],
+            ]);
 
-        $usuario = Auth::user();
-        $usuario->name = $request->name;
-        $usuario->email = $request->email;
-        $usuario->save();
+            $usuario = Auth::user();
+            if (!$usuario instanceof User) {
+                return redirect()->back()->with('error', 'Usuario no válido.');
+            }
 
-        return redirect()->route('profile.edit')
-            ->with('success', 'Perfil actualizado correctamente');
+            $usuario->name = trim($request->nombre);
+            $usuario->email = trim($request->email);
+
+            try {
+                $usuario->save();
+            } catch (QueryException $e) {
+                Log::error('Error al guardar perfil en DB: ' . $e->getMessage());
+                return redirect()->back()->with('error', 'Error al guardar perfil');
+            }
+
+            Log::info('Perfil actualizado para usuario ID: ' . $usuario->id);
+            return redirect()->route('perfil.editar')->with('exito', 'Perfil actualizado correctamente');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()->withErrors($e->validator)->withInput();
+        } catch (\Exception $e) {
+            Log::error('Error al actualizar perfil: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error al actualizar perfil')->withInput();
+        }
     }
 
-    /**
-     * Actualiza la ubicación del usuario
-     */
     public function actualizarUbicacion(Request $request): RedirectResponse
     {
-        $request->validate([
-            'latitud' => ['required', 'numeric', 'between:-90,90'],
-            'longitud' => ['required', 'numeric', 'between:-180,180'],
-        ]);
+        try {
+            $request->validate([
+                'latitud' => ['required', 'numeric', 'between:-90,90'],
+                'longitud' => ['required', 'numeric', 'between:-180,180'],
+            ]);
 
-        $usuario = Auth::user();
+            $usuario = Auth::user();
+            if (!$usuario instanceof User) {
+                return redirect()->back()->with('error', 'Usuario no válido.');
+            }
 
-        // Guardar coordenadas
-        $ubicacion = $usuario->ubicacion ?? $usuario->ubicacion()->create([]);
-        $ubicacion->latitud = $request->latitud;
-        $ubicacion->longitud = $request->longitud;
+            $usuario->latitud = round((float)$request->latitud, 6);
+            $usuario->longitud = round((float)$request->longitud, 6);
 
-        // Obtener dirección mediante geocodificación inversa
-        $direccion = $this->geocodificacionInversa($request->latitud, $request->longitud);
-        
-        if ($direccion) {
-            $ubicacion->direccion = $direccion['formatted_address'] ?? null;
-            $ubicacion->ciudad = $direccion['city'] ?? null;
-            $ubicacion->pais = $direccion['country'] ?? null;
+            $direccion = $this->geocodificacionInversa($usuario->latitud, $usuario->longitud);
+
+            if ($direccion) {
+                $usuario->direccion = $direccion['direccion_formateada'] ?? null;
+                $usuario->ciudad = $direccion['ciudad'] ?? null;
+                $usuario->pais = $direccion['pais'] ?? null;
+            }
+
+            try {
+                $usuario->save();
+            } catch (QueryException $e) {
+                Log::error('Error al guardar ubicación en DB: ' . $e->getMessage());
+                return redirect()->back()->with('error', 'Error al guardar ubicación');
+            }
+
+            Log::info('Ubicación actualizada para usuario ID: ' . $usuario->id);
+            return redirect()->route('perfil.editar')->with('exito', 'Ubicación actualizada correctamente');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return redirect()->back()->withErrors($e->validator)->withInput();
+        } catch (\Exception $e) {
+            Log::error('Error al actualizar ubicación: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error al actualizar ubicación')->withInput();
         }
-
-        $ubicacion->save();
-
-        return redirect()->route('profile.edit')
-            ->with('success', 'Ubicación actualizada correctamente');
     }
 
-    /**
-     * Geocodificación inversa usando Google Maps API
-     */
     private function geocodificacionInversa(float $latitud, float $longitud): ?array
     {
-        $apiKey = config('services.google_maps.api_key');
-        if (!$apiKey) return null;
+        $claveApi = config('services.google_maps.api_key') ?? config('servicios.google_maps.clave_api');
+
+        if (!$claveApi) {
+            Log::warning('Clave API de Google Maps no configurada');
+            return null;
+        }
 
         try {
-            $response = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
+            $respuesta = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
                 'latlng' => "{$latitud},{$longitud}",
-                'key' => $apiKey,
+                'key' => $claveApi,
                 'language' => 'es',
             ]);
 
-            if ($response->successful() && $response->json('status') === 'OK') {
-                $resultados = $response->json('results');
-                
-                if (!empty($resultados)) {
-                    $resultado = $resultados[0];
+            if ($respuesta->successful() && $respuesta->json('status') === 'OK') {
+                $resultado = $respuesta->json('results')[0] ?? null;
+                if ($resultado) {
                     return [
-                        'formatted_address' => $resultado['formatted_address'] ?? null,
-                        'city' => $this->extraerComponenteDireccion($resultado, 'locality'),
-                        'country' => $this->extraerComponenteDireccion($resultado, 'country'),
+                        'direccion_formateada' => $resultado['formatted_address'] ?? null,
+                        'ciudad' => $this->extraerComponenteDireccion($resultado, 'locality'),
+                        'pais' => $this->extraerComponenteDireccion($resultado, 'country'),
                     ];
                 }
             }
         } catch (\Exception $e) {
-            \Log::error('Error en geocodificación inversa: ' . $e->getMessage());
+            Log::error('Error en geocodificación inversa: ' . $e->getMessage());
         }
 
         return null;
     }
 
-    /**
-     * Extrae un componente específico de la dirección
-     */
+
     private function extraerComponenteDireccion(array $resultado, string $tipo): ?string
     {
         foreach ($resultado['address_components'] ?? [] as $componente) {
@@ -128,46 +151,48 @@ class PerfilesController extends Controller
         return null;
     }
 
-    /**
-     * Obtiene datos meteorológicos de OpenWeather API
-     */
+
     private function obtenerDatosClima(float $latitud, float $longitud): ?array
     {
-        $apiKey = config('services.openweather.api_key');
-        if (!$apiKey) return null;
+        $claveApi = config('services.openweather.api_key') ?? config('servicios.openweather.clave_api');
+
+        if (!$claveApi) {
+            Log::warning('Clave API de OpenWeather no configurada');
+            return null;
+        }
 
         try {
-            $response = Http::get('https://api.openweathermap.org/data/2.5/weather', [
+            $respuesta = Http::get('https://api.openweathermap.org/data/2.5/weather', [
                 'lat' => $latitud,
                 'lon' => $longitud,
-                'appid' => $apiKey,
+                'appid' => $claveApi,
                 'units' => 'metric',
                 'lang' => 'es',
             ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
+            if ($respuesta->successful()) {
+                $datos = $respuesta->json();
+                $clima = $datos['weather'][0] ?? [];
+
                 return [
-                    'temperatura' => round($data['main']['temp']),
-                    'sensacion' => round($data['main']['feels_like']),
-                    'descripcion' => ucfirst($data['weather'][0]['description'] ?? ''),
-                    'icono' => $data['weather'][0]['icon'] ?? '',
-                    'humedad' => $data['main']['humidity'],
-                    'velocidad_viento' => $data['wind']['speed'],
-                    'clima_principal' => $data['weather'][0]['main'] ?? '',
-                    'es_adverso' => $this->climaAdverso($data['weather'][0]['main'] ?? ''),
+                    'temperatura' => round($datos['main']['temp'] ?? 0),
+                    'sensacion_termica' => round($datos['main']['feels_like'] ?? 0),
+                    'descripcion' => ucfirst($clima['description'] ?? ''),
+                    'icono' => $clima['icon'] ?? '',
+                    'humedad' => $datos['main']['humidity'] ?? null,
+                    'velocidad_viento' => $datos['wind']['speed'] ?? null,
+                    'clima_principal' => $clima['main'] ?? '',
+                    'es_adverso' => $this->climaAdverso($clima['main'] ?? ''),
                 ];
             }
         } catch (\Exception $e) {
-            \Log::error('Error al obtener datos del clima: ' . $e->getMessage());
+            Log::error('Error al obtener datos del clima: ' . $e->getMessage());
         }
 
         return null;
     }
 
-    /**
-     * Determina si el clima es adverso
-     */
+
     private function climaAdverso(string $climaPrincipal): bool
     {
         $condicionesAdversas = ['Rain', 'Snow', 'Thunderstorm', 'Drizzle', 'Squall', 'Tornado'];

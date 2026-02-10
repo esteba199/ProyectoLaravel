@@ -121,14 +121,18 @@
         let mapa;
         let marcador;
         
-        // Coordenadas por defecto (Madrid, España)
-        const latitudPorDefecto = {{ $usuario->latitud ?? 40.4168 }};
-        const longitudPorDefecto = {{ $usuario->longitud ?? -3.7038 }};
+         // Obtener valores del HTML directamente
+        const latitudInput = document.getElementById('latitud');
+        const longitudInput = document.getElementById('longitud');
 
+        // Usar los valores de los inputs o valores por defecto
+        const latitudPorDefecto = latitudInput.value ? parseFloat(latitudInput.value) : 40.4168;
+        const longitudPorDefecto = longitudInput.value ? parseFloat(longitudInput.value) : -3.7038;
+        
         function inicializarMapa() {
             // Crear mapa
             mapa = new google.maps.Map(document.getElementById('mapa'), {
-                center: { lat: latitudPorDefecto, lng: longitudPorDefecto },
+                center: { lat: latitudInput.value, lng: longitudInput.value },
                 zoom: 13,
                 mapTypeControl: true,
                 streetViewControl: true,

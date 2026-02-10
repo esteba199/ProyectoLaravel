@@ -10,16 +10,18 @@ class Cita extends Model
 {
     use HasFactory;
 
+    protected $table = 'citas'; // Forzamos el nombre de la tabla
+
     /**
-     * Atributos asignables en masa
+     * Atributos asignables en masa (Sincronizados con español)
      */
     protected $fillable = [
         'usuario_id',
-        'nombre_paciente',
-        'nombre_doctor',
+        'paciente',      // Antes: nombre_paciente
+        'doctor',        // Antes: nombre_doctor
         'especialidad',
-        'fecha_cita',
-        'hora_cita',
+        'fecha',         // Antes: fecha_cita
+        'hora',          // Antes: hora_cita
         'motivo',
         'estado',
         'notas',
@@ -31,13 +33,13 @@ class Cita extends Model
     protected function casts(): array
     {
         return [
-            'fecha_cita' => 'date',
-            'hora_cita' => 'datetime:H:i',
+            'fecha' => 'date',
+            'hora' => 'datetime:H:i',
         ];
     }
 
     /**
-     * Relación inversa: una cita pertenece a un usuario
+     * Relación inversa
      */
     public function usuario()
     {
@@ -45,42 +47,34 @@ class Cita extends Model
     }
 
     /**
-     * Scope: filtrar citas por estado
+     * Scopes corregidos a los nuevos nombres
      */
     public function scopePorEstado($query, $estado)
     {
         return $query->where('estado', $estado);
     }
 
-    /**
-     * Scope: citas pendientes
-     */
+    
     public function scopePendientes($query)
     {
         return $query->where('estado', 'pendiente');
     }
 
-    /**
-     * Scope: citas futuras
-     */
+
     public function scopeFuturas($query)
     {
-        return $query->where('fecha_cita', '>=', Carbon::today())
-                     ->orderBy('fecha_cita', 'asc')
-                     ->orderBy('hora_cita', 'asc');
+        return $query->where('fecha', '>=', Carbon::today())
+                     ->orderBy('fecha', 'asc')
+                     ->orderBy('hora', 'asc');
     }
 
-    /**
-     * Verifica si la cita es futura
-     */
+
     public function esFutura(): bool
     {
-        return $this->fecha_cita >= Carbon::today();
+        return $this->fecha >= Carbon::today();
     }
 
-    /**
-     * Obtiene la clase CSS para el badge según el estado
-     */
+
     public function claseEstado(): string
     {
         return match($this->estado) {
@@ -92,9 +86,7 @@ class Cita extends Model
         };
     }
 
-    /**
-     * Obtiene el texto del estado en español
-     */
+
     public function etiquetaEstado(): string
     {
         return match($this->estado) {

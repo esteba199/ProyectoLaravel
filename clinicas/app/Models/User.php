@@ -2,57 +2,46 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany; // Importante añadir esta línea
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
-    
     use HasFactory, Notifiable;
 
-    /**
-     * Atributos asignables en masa
-     */
+    // INDICAMOS LA TABLA EN ESPAÑOL
+    protected $table = 'usuarios';
+
+    // INDICAMOS LAS COLUMNAS EN ESPAÑOL
     protected $fillable = [
-        'name',
-        'email',
-        'password',
+        'nombre',
+        'correo',
+        'clave',
     ];
 
-    /**
-     * Atributos ocultos al serializar
-     */
     protected $hidden = [
-        'password',
+        'clave',
         'remember_token',
     ];
 
     /**
-     * Casts de atributos
+     * ESTA ES LA FUNCIÓN QUE TE FALTA
+     * Es la que permite usar $user->citas()
      */
-    protected function casts(): array
+    public function citas(): HasMany
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
-    }
-
-    /**
-     * Relación: un usuario tiene muchas citas
-     */
-    public function citas()
-    {
+        // Conecta este usuario con la tabla 'citas' usando la columna 'usuario_id'
         return $this->hasMany(Cita::class, 'usuario_id');
     }
 
     /**
-     * Relación: un usuario tiene una ubicación
+     * IMPORTANTE: Le decimos a Laravel que la contraseña se llama 'clave'
      */
-    public function ubicacion()
+    public function getAuthPassword()
     {
-        return $this->hasOne(Ubicacion::class, 'usuario_id');
+        return $this->clave;
     }
 }
