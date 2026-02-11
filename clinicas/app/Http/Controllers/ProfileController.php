@@ -14,10 +14,16 @@ class ProfileController extends Controller
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request): View
+    public function edit(Request $request, \App\Services\WeatherService $weatherService): View
     {
+        $user = $request->user();
+        $clima = $weatherService->getCurrentWeather($user->latitud, $user->longitud);
+        $climaAdverso = $weatherService->isAdverse($clima);
+
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user' => $user,
+            'clima' => $clima,
+            'climaAdverso' => $climaAdverso,
         ]);
     }
 

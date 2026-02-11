@@ -11,11 +11,14 @@ use Illuminate\Http\RedirectResponse;
 
 class CitaController extends Controller 
 {
-    public function index(Request $request): View
+    public function index(Request $request, \App\Services\WeatherService $weatherService): View
     {
         /** @var User $user */
         $user = Auth::user(); 
         
+        $clima = $weatherService->getCurrentWeather($user->latitud, $user->longitud);
+        $climaAdverso = $weatherService->isAdverse($clima);
+
         // Si aquí da error, es que NO has puesto la función en el modelo User.php
         $query = $user->citas();
 
@@ -26,7 +29,12 @@ class CitaController extends Controller
                        ->paginate(10)
                        ->withQueryString();
 
-        return view('citas.index', compact('citas'));
+        return view('citas.index', compact('citas', 'clima', 'climaAdverso'));
+    }
+
+    public function create(): View
+    {
+        return view('citas.create');
     }
 
     public function store(Request $request): RedirectResponse
